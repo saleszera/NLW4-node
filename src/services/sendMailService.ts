@@ -6,7 +6,7 @@ interface SendMail {
   to: string;
   subject: string;
   variables: {
-    user_id: string;
+    id: string;
     name: string;
     title: string;
     description: string;
@@ -40,7 +40,7 @@ class SendMailService {
     const mailTemplateParse = handlebars.compile(templateFileContent);
 
     const html = mailTemplateParse({
-      user_id: variables.user_id,
+      id: variables.id,
       name: variables.name,
       title: variables.title,
       description: variables.description,

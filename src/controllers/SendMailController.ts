@@ -6,9 +6,10 @@ import { SurveysRepository } from '../repositories/SurveysRepository';
 import { SurveysUsersRepository } from '../repositories/SurveysUsersRepository';
 import { UsersRepository } from '../repositories/UsersRepository';
 import sendMailService from '../services/sendMailService';
+import { AppError } from '../errors/AppError';
 
 class SendMailController {
-  async execute(request: Request, response: Response) {
+  async execute(request: Request, response: Response): Promise<Response> {
     const { email, survey_id } = request.body;
 
     const usersRepository = getCustomRepository(UsersRepository);
@@ -18,31 +19,32 @@ class SendMailController {
     const userExists = await usersRepository.findOne({ email });
 
     if (!userExists) {
-      return response.status(400).json({ Error: 'User does not exists' });
+      throw new AppError('User does not exists');
     }
 
     const surveyExists = await surveyRepository.findOne({ id: survey_id });
 
     if (!surveyExists) {
-      return response.status(400).json({ Error: 'Survey does not exists' });
+      throw new AppError('Survey does not exists');
     }
 
     const npsPath = resolve(__dirname, '..', 'views', 'emails', 'npsMail.hbs');
 
+    const surveysUsers = await surveysUsersRepository.findOne({
+      where: { user_id: userExists.id, value: null },
+      relations: ['user', 'survey'],
+    });
+
     const variables = {
-      user_id: userExists.id,
+      id: '',
       name: userExists.name,
       title: surveyExists.title,
       description: surveyExists.description,
       link: process.env.URL_MAIL,
     };
 
-    const surveysUsers = await surveysUsersRepository.findOne({
-      where: [{ user_id: userExists.id }, { value: null }],
-      relations: ['user', 'survey'],
-    });
-
     if (surveysUsers) {
+      variables.id = surveysUsers.id;
       await sendMailService.execute({
         to: userExists.email,
         subject: surveyExists.title,
@@ -60,6 +62,8 @@ class SendMailController {
 
     await surveysUsersRepository.save(surveyUser);
 
+    variables.id = surveyUser.id;
+
     await sendMailService.execute({
       to: userExists.email,
       subject: surveyExists.title,
@@ -67,7 +71,7 @@ class SendMailController {
       variables,
     });
 
-    return response.status(200).json(surveyUser);
+    return response.status(201).json(surveyUser);
   }
 }
 
